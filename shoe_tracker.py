@@ -65,16 +65,68 @@ def check_price():
     with open(PRICE_FILE, "w") as f:
         f.write(str(price))
 
-    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    now_utc = datetime.utcnow()
+    now_iso = now_utc.isoformat() + "Z"
     with open(HTML_FILE, "w") as f:
         f.write(f"""
         <html>
-        <head><title>Shoe Tracker Status</title></head>
+        <head>
+            <title>Shoe Tracker Status</title>
+            <meta charset="UTF-8">
+        </head>
         <body>
             <h1>Shoe Tracker Status</h1>
-            <p>Last run: {now}</p>
+            <p>Last run: <span id="timestamp" data-utc="{now_iso}">Loading...</span></p>
             <p>Current price: ${price}</p>
             <p>URL: <a href="{URL}">{URL}</a></p>
+            <script>
+                function updateTime() {{
+                    const span = document.getElementById('timestamp');
+                    const utcTime = new Date(span.getAttribute('data-utc'));
+                    
+                    // Convert to CST using proper timezone conversion
+                    const timeStr = utcTime.toLocaleString('en-US', {{
+                        timeZone: 'America/Chicago',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true
+                    }}) + ' CST';
+                    
+                    // Calculate minutes ago
+                    const now = new Date();
+                    const diffMs = now - utcTime;
+                    const diffMins = Math.floor(diffMs / (1000 * 60));
+                    
+                    let timeAgo;
+                    if (diffMins < 1) {{
+                        timeAgo = 'just now';
+                    }} else if (diffMins === 1) {{
+                        timeAgo = '1 minute ago';
+                    }} else if (diffMins < 60) {{
+                        timeAgo = diffMins + ' minutes ago';
+                    }} else if (diffMins < 1440) {{
+                        const diffHours = Math.floor(diffMins / 60);
+                        const remainMins = diffMins % 60;
+                        if (diffHours === 1) {{
+                            timeAgo = remainMins > 0 ? '1 hour ' + remainMins + ' minutes ago' : '1 hour ago';
+                        }} else {{
+                            timeAgo = remainMins > 0 ? diffHours + ' hours ' + remainMins + ' minutes ago' : diffHours + ' hours ago';
+                        }}
+                    }} else {{
+                        const diffDays = Math.floor(diffMins / 1440);
+                        timeAgo = diffDays === 1 ? '1 day ago' : diffDays + ' days ago';
+                    }}
+                    
+                    span.textContent = timeStr + ' (' + timeAgo + ')';
+                }}
+                
+                updateTime();
+                setInterval(updateTime, 60000); // Update every minute
+            </script>
         </body>
         </html>
         """)
