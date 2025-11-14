@@ -3,12 +3,14 @@ from bs4 import BeautifulSoup
 import re
 import os
 from datetime import datetime
+import json
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 URL = "https://www.runningshoedeals.com/shoes/adidas-adizero-adios-pro-4?category=Women&size=6.5"
 PRICE_FILE = "last_price.txt"
+HISTORY_FILE = "price_history.json"
 HTML_FILE = "index.html"
 
 def send_alert(message):
@@ -55,36 +57,70 @@ def check_price():
 
     print("📂 Last recorded price:", last_price)
 
-    if last_price is None:
-        send_alert(f"📢 Tracker initialized. Baseline price: ${price}\n{URL}")
-    elif price < last_price:
-        send_alert(f"🔥 Price drop detected: {last_price} → {price}\n{URL}")
-    else:
-        print("ℹ️ No price drop detected.")
-
-    with open(PRICE_FILE, "w") as f:
-        f.write(str(price))
+    # Load price history
+    try:
+        with open(HISTORY_FILE) as f:
+            history = json.load(f)
+    except:
+        history = []
 
     now_utc = datetime.utcnow()
     now_iso = now_utc.isoformat() + "Z"
+
+    # Check if price changed
+    if last_price is None:
+        send_alert(f"📢 Tracker initialized. Baseline price: ${price}\n{URL}")
+        history.append({"timestamp": now_iso, "price": price, "change": "initialized"})
+    elif price < last_price:
+        send_alert(f"🔥 Price drop detected: ${last_price} → ${price}\n{URL}")
+        history.append({"timestamp": now_iso, "price": price, "change": "down"})
+    elif price > last_price:
+        print(f"📈 Price increased: ${last_price} → ${price}")
+        history.append({"timestamp": now_iso, "price": price, "change": "up"})
+    else:
+        print("ℹ️ No price change.")
+
+    # Always update the current price
+    with open(PRICE_FILE, "w") as f:
+        f.write(str(price))
+
+    # Save history (keep last 50 entries)
+    history = history[-50:]
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(history, f, indent=2)
+    # Build price history HTML
+    history_html = ""
+    if history:
+        history_html = "<h2>Price History</h2><table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>"
+        history_html += "<tr><th>Date/Time (CST)</th><th>Price</th><th>Change</th></tr>"
+        for entry in reversed(history[-10:]):  # Show last 10 entries, newest first
+            timestamp = entry['timestamp']
+            entry_price = entry['price']
+            change = entry['change']
+            change_icon = "🔥" if change == "down" else ("📈" if change == "up" else "ℹ️")
+            history_html += f"<tr><td><span class='history-time' data-utc='{timestamp}'></span></td><td>${entry_price}</td><td>{change_icon} {change}</td></tr>"
+        history_html += "</table>"
+
     with open(HTML_FILE, "w") as f:
         f.write(f"""
         <html>
         <head>
             <title>Shoe Tracker Status</title>
             <meta charset="UTF-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                table {{ margin-top: 10px; }}
+                th {{ background-color: #f0f0f0; }}
+            </style>
         </head>
         <body>
             <h1>Shoe Tracker Status</h1>
             <p>Last run: <span id="timestamp" data-utc="{now_iso}">Loading...</span></p>
-            <p>Current price: ${price}</p>
+            <p><strong>Current price: ${price}</strong></p>
             <p>URL: <a href="{URL}">{URL}</a></p>
+            {history_html}
             <script>
-                function updateTime() {{
-                    const span = document.getElementById('timestamp');
-                    const utcTime = new Date(span.getAttribute('data-utc'));
-                    
-                    // Convert to CST using proper timezone conversion
+                function formatTime(utcTime) {{
                     const timeStr = utcTime.toLocaleString('en-US', {{
                         timeZone: 'America/Chicago',
                         year: 'numeric',
@@ -121,11 +157,34 @@ def check_price():
                         timeAgo = diffDays === 1 ? '1 day ago' : diffDays + ' days ago';
                     }}
                     
-                    span.textContent = timeStr + ' (' + timeAgo + ')';
+                    return timeStr + ' (' + timeAgo + ')';
                 }}
                 
-                updateTime();
-                setInterval(updateTime, 60000); // Update every minute
+                function updateAllTimes() {{
+                    // Update main timestamp
+                    const span = document.getElementById('timestamp');
+                    if (span) {{
+                        const utcTime = new Date(span.getAttribute('data-utc'));
+                        span.textContent = formatTime(utcTime);
+                    }}
+                    
+                    // Update history timestamps
+                    const historySpans = document.querySelectorAll('.history-time');
+                    historySpans.forEach(span => {{
+                        const utcTime = new Date(span.getAttribute('data-utc'));
+                        span.textContent = utcTime.toLocaleString('en-US', {{
+                            timeZone: 'America/Chicago',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                        }});
+                    }});
+                }}
+                
+                updateAllTimes();
+                setInterval(updateAllTimes, 60000); // Update every minute
             </script>
         </body>
         </html>

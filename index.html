@@ -3,18 +3,20 @@
         <head>
             <title>Shoe Tracker Status</title>
             <meta charset="UTF-8">
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                table { margin-top: 10px; }
+                th { background-color: #f0f0f0; }
+            </style>
         </head>
         <body>
             <h1>Shoe Tracker Status</h1>
-            <p>Last run: <span id="timestamp" data-utc="2025-11-14T07:23:27.356876Z">Loading...</span></p>
-            <p>Current price: $221.49</p>
+            <p>Last run: <span id="timestamp" data-utc="2025-11-14T07:34:58.779343Z">Loading...</span></p>
+            <p><strong>Current price: $221.49</strong></p>
             <p>URL: <a href="https://www.runningshoedeals.com/shoes/adidas-adizero-adios-pro-4?category=Women&size=6.5">https://www.runningshoedeals.com/shoes/adidas-adizero-adios-pro-4?category=Women&size=6.5</a></p>
+            
             <script>
-                function updateTime() {
-                    const span = document.getElementById('timestamp');
-                    const utcTime = new Date(span.getAttribute('data-utc'));
-                    
-                    // Convert to CST using proper timezone conversion
+                function formatTime(utcTime) {
                     const timeStr = utcTime.toLocaleString('en-US', {
                         timeZone: 'America/Chicago',
                         year: 'numeric',
@@ -51,11 +53,34 @@
                         timeAgo = diffDays === 1 ? '1 day ago' : diffDays + ' days ago';
                     }
                     
-                    span.textContent = timeStr + ' (' + timeAgo + ')';
+                    return timeStr + ' (' + timeAgo + ')';
                 }
                 
-                updateTime();
-                setInterval(updateTime, 60000); // Update every minute
+                function updateAllTimes() {
+                    // Update main timestamp
+                    const span = document.getElementById('timestamp');
+                    if (span) {
+                        const utcTime = new Date(span.getAttribute('data-utc'));
+                        span.textContent = formatTime(utcTime);
+                    }
+                    
+                    // Update history timestamps
+                    const historySpans = document.querySelectorAll('.history-time');
+                    historySpans.forEach(span => {
+                        const utcTime = new Date(span.getAttribute('data-utc'));
+                        span.textContent = utcTime.toLocaleString('en-US', {
+                            timeZone: 'America/Chicago',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                        });
+                    });
+                }
+                
+                updateAllTimes();
+                setInterval(updateAllTimes, 60000); // Update every minute
             </script>
         </body>
         </html>
