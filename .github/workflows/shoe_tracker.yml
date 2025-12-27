@@ -1,19 +1,19 @@
 name: Shoe Price Tracker
 
 on:
-  schedule:
-    - cron: "0 */3 * * *"
+  # schedule:
+  #   - cron: "0 */3 * * *"
   workflow_dispatch:
 
 permissions:
-  contents: write   # allow pushing commits
+  contents:  write   # allow pushing commits
 
 jobs:
-  run-tracker:
+  run-tracker: 
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses:  actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -26,8 +26,8 @@ jobs:
       - name: Run tracker
         run: python shoe_tracker.py
         env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
+          BOT_TOKEN:  ${{ secrets.BOT_TOKEN }}
+          CHAT_ID:  ${{ secrets.CHAT_ID }}
 
       - name: Upload status page
         run: |
